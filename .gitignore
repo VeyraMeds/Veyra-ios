@@ -5,3 +5,10 @@ DerivedData/
 build/
 *.ipa
 *.xcarchive
+# Sensitive files
+*.pem
+*.p12
+*.cer
+*.mobileprovision
+*_base64*.txt
+VEYRA_CSR.csr
