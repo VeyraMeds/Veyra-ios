@@ -7,19 +7,20 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout and setup
+      - name: Upload screenshots
         env:
           APP_STORE_CONNECT_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          set -e
+          
           # Clone repo
           git clone https://github.com/VeyraMeds/Veyra-ios.git /tmp/repo
-          cd /tmp/repo
           
-          # Verify screenshots
+          # Verify screenshots exist
           echo "=== Screenshots ==="
-          ls -la screenshots/
+          ls -la /tmp/repo/screenshots/
           
           # Install fastlane
           echo "=== Installing fastlane ==="
@@ -30,15 +31,20 @@ jobs:
           mkdir -p ~/.private_keys
           cp /tmp/AuthKey.p8 ~/.private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
           
-          # Create API key JSON
-          KEY_CONTENT=$(cat /tmp/AuthKey.p8)
-          cat > /tmp/api_key.json << KEYJSON
-          {
-            "key_id": "$APP_STORE_CONNECT_KEY_ID",
-            "issuer_id": "$APP_STORE_CONNECT_ISSUER_ID",
-            "key": "$KEY_CONTENT"
+          # Create API key JSON - properly escaped
+          python3 -c "
+          import json
+          with open('/tmp/AuthKey.p8') as f:
+              key = f.read()
+          data = {
+              'key_id': '$APP_STORE_CONNECT_KEY_ID',
+              'issuer_id': '$APP_STORE_CONNECT_ISSUER_ID',
+              'key': key
           }
-          KEYJSON
+          with open('/tmp/api_key.json', 'w') as f:
+              json.dump(data, f)
+          print('API key JSON created')
+          "
           
           echo "=== Uploading screenshots ==="
           fastlane deliver \
@@ -48,4 +54,6 @@ jobs:
             --skip_metadata \
             --skip_binary \
             --overwrite_screenshots \
+            --force \
+            --run_precheck_before_submit false \
             --verbose
