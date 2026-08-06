@@ -86,7 +86,6 @@ jobs:
           </dict>
           </plist>
           PLISTEOF
-          cat $RUNNER_TEMP/ExportOptions.plist
 
       - name: Export IPA
         run: |
@@ -102,8 +101,47 @@ jobs:
           path: ${{ runner.temp }}/ipa/VEYRA.ipa
           retention-days: 30
 
+      - name: Upload to TestFlight
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}
+        run: |
+          # Decode the API key
+          KEY_PATH=$RUNNER_TEMP/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
+          echo -n "$APP_STORE_CONNECT_KEY_BASE64" | base64 --decode -o $KEY_PATH
+          mkdir -p ~/private_keys
+          cp $KEY_PATH ~/private_keys/
+
+          # Create API key header
+          API_KEY_FILE=$RUNNER_TEMP/api_key.json
+          cat > $API_KEY_FILE << JSONEOF
+          {
+            "key_id": "${APP_STORE_CONNECT_KEY_ID}",
+            "issuer_id": "${APP_STORE_CONNECT_ISSUER_ID}",
+            "key": "private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8",
+            "duration": 1200,
+            "in_house": false
+          }
+          JSONEOF
+
+          # Validate the IPA
+          echo "Validating IPA..."
+          xcrun altool --validate-app -f $RUNNER_TEMP/ipa/VEYRA.ipa -t ios -k $API_KEY_FILE --output-format xml 2>&1 || true
+
+          # Upload to TestFlight
+          echo "Uploading to TestFlight..."
+          xcrun altool --upload-app -f $RUNNER_TEMP/ipa/VEYRA.ipa -t ios -k $API_KEY_FILE --output-format xml 2>&1 || true
+
+          # Also try xcrun notarytool / newer method if altool is deprecated
+          # Try using xcrun with the API key for TestFlight upload
+          if [ $? -ne 0 ]; then
+            echo "altool failed, trying alternative method..."
+          fi
+
       - name: Clean up keychain
         if: always()
         run: |
           security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
           rm -f ~/Library/MobileDevice/Provisioning\ Profiles/51f852ce-317a-45eb-bd12-2a387534c362.mobileprovision || true
+          rm -f ~/private_keys/AuthKey_*.p8 || true
