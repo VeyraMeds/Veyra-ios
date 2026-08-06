@@ -7,34 +7,32 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        run: |
-          git clone https://github.com/VeyraMeds/Veyra-ios.git .
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-
-      - name: Install fastlane
-        run: gem install fastlane --no-document
-
-      - name: Decode API Key
+      - name: Checkout and setup
         env:
           APP_STORE_CONNECT_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-        run: |
-          echo "$APP_STORE_CONNECT_KEY_BASE64" | base64 -d > AuthKey.p8
-          mkdir -p ~/.private_keys
-          cp AuthKey.p8 ~/.private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
-
-      - name: Upload screenshots
-        env:
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
-          KEY_CONTENT=$(cat AuthKey.p8)
-          cat > api_key.json << KEYJSON
+          # Clone repo
+          git clone https://github.com/VeyraMeds/Veyra-ios.git /tmp/repo
+          cd /tmp/repo
+          
+          # Verify screenshots
+          echo "=== Screenshots ==="
+          ls -la screenshots/
+          
+          # Install fastlane
+          echo "=== Installing fastlane ==="
+          sudo gem install fastlane --no-document 2>&1 | tail -3
+          
+          # Decode API key
+          echo "$APP_STORE_CONNECT_KEY_BASE64" | base64 -d > /tmp/AuthKey.p8
+          mkdir -p ~/.private_keys
+          cp /tmp/AuthKey.p8 ~/.private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
+          
+          # Create API key JSON
+          KEY_CONTENT=$(cat /tmp/AuthKey.p8)
+          cat > /tmp/api_key.json << KEYJSON
           {
             "key_id": "$APP_STORE_CONNECT_KEY_ID",
             "issuer_id": "$APP_STORE_CONNECT_ISSUER_ID",
@@ -42,13 +40,11 @@ jobs:
           }
           KEYJSON
           
-          # List screenshots to verify they exist
-          ls -la screenshots/
-          
+          echo "=== Uploading screenshots ==="
           fastlane deliver \
-            --api_key_path api_key.json \
+            --api_key_path /tmp/api_key.json \
             --app_id 6798569405 \
-            --screenshots screenshots/ \
+            --screenshots /tmp/repo/screenshots/ \
             --skip_metadata \
             --skip_binary \
             --overwrite_screenshots \
