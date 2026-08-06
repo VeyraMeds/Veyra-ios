@@ -57,34 +57,39 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="Veyra" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
 
-      - name: Export IPA
+      - name: Create export options plist
         env:
-          EXPORT_PLIST: |
-            <?xml version="1.0" encoding="UTF-8"?>
-            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-            <plist version="1.0">
-            <dict>
-              <key>method</key>
-              <string>app-store</string>
-              <key>teamID</key>
-              <string>${{ secrets.APPLE_TEAM_ID }}</string>
-              <key>uploadBitcode</key>
-              <false/>
-              <key>uploadSymbols</key>
-              <true/>
-              <key>stripSwiftSymbols</key>
-              <true/>
-              <key>signingStyle</key>
-              <string>manual</string>
-              <key>provisioningProfiles</key>
-              <dict>
-                <key>com.veyrameds.app</key>
-                <string>Veyra</string>
-              </dict>
-            </dict>
-            </plist>
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          echo '$EXPORT_PLIST' | sed "s/\${{ secrets.APPLE_TEAM_ID }}/${{ secrets.APPLE_TEAM_ID }}/" > $RUNNER_TEMP/ExportOptions.plist
+          cat > $RUNNER_TEMP/ExportOptions.plist << PLISTEOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>teamID</key>
+            <string>${APPLE_TEAM_ID}</string>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.veyrameds.app</key>
+              <string>Veyra</string>
+            </dict>
+          </dict>
+          </plist>
+          PLISTEOF
+          cat $RUNNER_TEMP/ExportOptions.plist
+
+      - name: Export IPA
+        run: |
           xcodebuild -exportArchive \
             -archivePath $RUNNER_TEMP/VEYRA.xcarchive \
             -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist \
