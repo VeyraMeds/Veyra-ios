@@ -42,11 +42,11 @@ jobs:
           TEAM_ID="${{ secrets.APPLE_TEAM_ID }}"
           sed -i '' "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = \"$TEAM_ID\";/" VEYRA.xcodeproj/project.pbxproj
 
-      - name: Auto-increment build number
+      - name: Set build number
         run: |
-          agvtool next-version -all
-          NEW_VERSION=$(agvtool what-version -terse)
-          echo "Build number set to: $NEW_VERSION"
+          BUILD_NUM=$((${{ github.run_number }} + 100))
+          echo "Setting build number to: $BUILD_NUM"
+          agvtool new-version -all $BUILD_NUM
 
       - name: Build archive
         run: |
