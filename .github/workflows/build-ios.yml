@@ -31,13 +31,14 @@ jobs:
           CERT_PATH=$RUNNER_TEMP/build_certificate.p12
           echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERT_PATH
           security import $CERT_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
           # Import provisioning profile
           PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
           echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/51f852ce-317a-45eb-bd12-2a387534c362.mobileprovision
 
       - name: Set Development Team
         run: |
@@ -51,7 +52,9 @@ jobs:
             -scheme VEYRA \
             -configuration Release \
             -archivePath $RUNNER_TEMP/VEYRA.xcarchive \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="iPhone Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="Veyra" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
 
       - name: Export IPA
@@ -71,6 +74,13 @@ jobs:
               <true/>
               <key>stripSwiftSymbols</key>
               <true/>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                <key>com.veyrameds.app</key>
+                <string>Veyra</string>
+              </dict>
             </dict>
             </plist>
         run: |
@@ -91,4 +101,4 @@ jobs:
         if: always()
         run: |
           security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
-          rm -f ~/Library/MobileDevice/Provisioning\ Profiles/build_pp.mobileprovision || true
+          rm -f ~/Library/MobileDevice/Provisioning\ Profiles/51f852ce-317a-45eb-bd12-2a387534c362.mobileprovision || true
