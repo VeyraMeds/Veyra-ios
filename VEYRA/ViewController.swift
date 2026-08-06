@@ -16,10 +16,19 @@ class ViewController: UIViewController {
     private func setupWebView() {
         let config = WKWebViewConfiguration()
         let contentController = WKUserContentController()
+        
+        // Inject app marker at document start — website uses this to hide enrollment/payment flows
+        let appMarkerScript = WKUserScript(
+            source: "window.isVEYRAApp = true;",
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        contentController.addUserScript(appMarkerScript)
+        
         config.userContentController = contentController
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
         config.allowsInlineMediaPlayback = true
-        config.applicationNameForUserAgent = "Safari/604.1"
+        config.applicationNameForUserAgent = "VEYRA-APP/1.0 Safari/604.1"
 
         webView = WKWebView(frame: view.bounds, configuration: config)
         webView.translatesAutoresizingMaskIntoConstraints = false
@@ -100,8 +109,17 @@ extension ViewController: WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         if let url = navigationAction.request.url {
             if let host = url.host {
-                if host.contains("veyrameds.com") || host.contains("stripe.com") || host.contains("base44.com") {
+                // Allow VEYRA and Base44 (backend API) — block everything else
+                if host.contains("veyrameds.com") || host.contains("base44.com") {
                     decisionHandler(.allow)
+                    return
+                }
+                // Redirect Stripe and all external payment URLs to Safari — no in-app payments
+                if host.contains("stripe.com") || host.contains("paypal.com") {
+                    if UIApplication.shared.canOpenURL(url) {
+                        UIApplication.shared.open(url)
+                    }
+                    decisionHandler(.cancel)
                     return
                 }
                 if url.scheme == "tel" || url.scheme == "mailto" {
